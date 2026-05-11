@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 
 import { createCourse } from "@/lib/course-api";
 import type { ExtractedFile } from "@/lib/types";
+import {
+	formatFileSize,
+	MAX_DIRECT_UPLOAD_BYTES,
+	MAX_STORAGE_UPLOAD_BYTES,
+} from "@/lib/upload-storage";
 
 type FormState = {
 	topic: string;
@@ -25,10 +30,50 @@ const buildingMessages = [
 	"Polishing quizzes and practice prompts...",
 ];
 
-const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+type SignedUploadResponse = {
+	path: string;
+	signedUrl: string;
+};
 
-function formatFileSize(bytes: number) {
-	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+async function uploadLargeFile(file: File) {
+	const uploadResponse = await fetch("/api/uploads", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			fileName: file.name,
+			contentType: file.type || "application/octet-stream",
+			size: file.size,
+		}),
+	});
+
+	const uploadPayload = (await uploadResponse.json().catch(() => ({}))) as
+		| SignedUploadResponse
+		| { error?: string };
+
+	if (!uploadResponse.ok || !("signedUrl" in uploadPayload)) {
+		throw new Error(
+			"error" in uploadPayload && uploadPayload.error
+				? uploadPayload.error
+				: "Could not prepare large-file upload.",
+		);
+	}
+
+	const signedFormData = new FormData();
+	signedFormData.append("cacheControl", "3600");
+	signedFormData.append("", file);
+
+	const storageResponse = await fetch(uploadPayload.signedUrl, {
+		method: "PUT",
+		body: signedFormData,
+	});
+
+	if (!storageResponse.ok) {
+		throw new Error(
+			`Could not upload the file to storage. Server returned ${storageResponse.status}.`,
+		);
+	}
+
+	return uploadPayload.path;
 }
 
 export function CreateCourseForm() {
@@ -66,21 +111,34 @@ export function CreateCourseForm() {
 		try {
 			let extractedFile: ExtractedFile | null = null;
 
-			if (file && file.size > MAX_UPLOAD_BYTES) {
+			if (file && file.size > MAX_STORAGE_UPLOAD_BYTES) {
 				throw new Error(
-					`The selected file is ${formatFileSize(file.size)}. Vercel uploads must be under ${formatFileSize(MAX_UPLOAD_BYTES)} for this version.`,
+					`The selected file is ${formatFileSize(file.size)}. Please upload a file under ${formatFileSize(MAX_STORAGE_UPLOAD_BYTES)}.`,
 				);
 			}
 
 			if (file) {
 				setStatusMessage(`Extracting text from ${file.name}...`);
-				const uploadFormData = new FormData();
-				uploadFormData.append("file", file);
+				let extractResponse: Response;
 
-				const extractResponse = await fetch("/api/extract-text", {
-					method: "POST",
-					body: uploadFormData,
-				});
+				if (file.size > MAX_DIRECT_UPLOAD_BYTES) {
+					setStatusMessage(`Uploading ${file.name} to secure storage...`);
+					const storagePath = await uploadLargeFile(file);
+					setStatusMessage(`Extracting text from ${file.name}...`);
+					extractResponse = await fetch("/api/extract-text", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ storagePath, fileName: file.name }),
+					});
+				} else {
+					const uploadFormData = new FormData();
+					uploadFormData.append("file", file);
+
+					extractResponse = await fetch("/api/extract-text", {
+						method: "POST",
+						body: uploadFormData,
+					});
+				}
 
 				if (!extractResponse.ok) {
 					const payload = (await extractResponse.json().catch(() => ({}))) as {
@@ -150,9 +208,9 @@ export function CreateCourseForm() {
 					<span className="text-[hsl(var(--text-tertiary))]">(optional)</span>
 				</p>
 				<p className="mb-4">
-					TXT, PDF, or DOCX under {formatFileSize(MAX_UPLOAD_BYTES)}. If you
-					upload a source, TextLingo can build the course directly from it
-					without a separate topic.
+					TXT, PDF, or DOCX under {formatFileSize(MAX_STORAGE_UPLOAD_BYTES)}.
+					Large files are uploaded through secure storage before text
+					extraction.
 				</p>
 				<label className="lesson-button-shadow inline-flex cursor-pointer items-center justify-center rounded-xl border border-[hsl(var(--border-hover))] bg-[hsl(var(--surface))] px-4 py-2 font-semibold uppercase text-[hsl(var(--text-primary))] transition hover:-translate-y-0.5 hover:bg-[hsl(var(--surface-hover))] active:translate-y-1 active:shadow-none">
 					Choose file
@@ -162,10 +220,13 @@ export function CreateCourseForm() {
 						onChange={(event) => {
 							const selectedFile = event.target.files?.[0] ?? null;
 							setError(null);
-							if (selectedFile && selectedFile.size > MAX_UPLOAD_BYTES) {
+							if (
+								selectedFile &&
+								selectedFile.size > MAX_STORAGE_UPLOAD_BYTES
+							) {
 								setFile(null);
 								setError(
-									`The selected file is ${formatFileSize(selectedFile.size)}. Please upload a file under ${formatFileSize(MAX_UPLOAD_BYTES)}.`,
+									`The selected file is ${formatFileSize(selectedFile.size)}. Please upload a file under ${formatFileSize(MAX_STORAGE_UPLOAD_BYTES)}.`,
 								);
 								event.target.value = "";
 								return;

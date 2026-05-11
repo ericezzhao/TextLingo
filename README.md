@@ -9,6 +9,7 @@ Most learners are expected to use the hosted web app rather than running the pro
 - Topic-based AI course generation
 - Optional source-material upload for TXT, PDF, and DOCX
 - Uploaded source material is treated as the primary authority for generation
+- Large source uploads use Supabase Storage before server-side text extraction
 - Section-based course roadmap with locked future lessons
 - Lesson gating: learners can only open completed lessons or the next incomplete lesson
 - Multi-page lesson viewer with fixed top navigation and bottom controls
@@ -84,6 +85,12 @@ This creates the required tables:
 
 - `textlingo_learners`
 - `textlingo_courses`
+
+Large uploaded source files are stored temporarily in a private Supabase Storage bucket named:
+
+- `textlingo-source-uploads`
+
+The app attempts to create this bucket automatically using the server-side Supabase key. If automatic bucket creation is blocked in your Supabase project, create the bucket manually as a private bucket with a file size limit of at least 25 MB.
 
 TextLingo uses an anonymous browser-scoped learner cookie for this MVP, so no user authentication setup is required for replication.
 

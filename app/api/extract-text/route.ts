@@ -2,10 +2,15 @@ import { NextResponse } from "next/server";
 import mammoth from "mammoth";
 import pdfParse from "pdf-parse";
 
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import {
+	MAX_DIRECT_UPLOAD_BYTES,
+	SOURCE_UPLOAD_BUCKET,
+} from "@/lib/upload-storage";
+
 export const runtime = "nodejs";
 
 const MAX_TEXT_LENGTH = 12000;
-const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 function trimText(value: string) {
 	const normalized = value.replace(/\s+/g, " ").trim();
@@ -15,28 +20,69 @@ function trimText(value: string) {
 	};
 }
 
-export async function POST(request: Request) {
-	try {
-		const formData = await request.formData();
-		const file = formData.get("file");
+async function readUpload(request: Request) {
+	const contentType = request.headers.get("content-type") ?? "";
 
-		if (!(file instanceof File)) {
-			return NextResponse.json({ error: "No file uploaded." }, { status: 400 });
+	if (contentType.includes("application/json")) {
+		const body = (await request.json()) as {
+			storagePath?: string;
+			fileName?: string;
+		};
+
+		if (!body.storagePath || !body.fileName) {
+			return { error: "Storage path and file name are required.", status: 400 };
 		}
 
-		if (file.size > MAX_UPLOAD_BYTES) {
+		const supabase = getSupabaseAdmin();
+		const { data, error } = await supabase.storage
+			.from(SOURCE_UPLOAD_BUCKET)
+			.download(body.storagePath);
+
+		if (error || !data) {
+			throw new Error(error?.message ?? "Could not download uploaded file.");
+		}
+
+		return {
+			fileName: body.fileName,
+			buffer: Buffer.from(await data.arrayBuffer()),
+		};
+	}
+
+	const formData = await request.formData();
+	const file = formData.get("file");
+
+	if (!(file instanceof File)) {
+		return { error: "No file uploaded.", status: 400 };
+	}
+
+	if (file.size > MAX_DIRECT_UPLOAD_BYTES) {
+		return {
+			error:
+				"This file is too large for direct extraction. Upload it through the large-file storage flow.",
+			status: 413,
+		};
+	}
+
+	return {
+		fileName: file.name,
+		buffer: Buffer.from(await file.arrayBuffer()),
+	};
+}
+
+export async function POST(request: Request) {
+	try {
+		const upload = await readUpload(request);
+
+		if ("error" in upload) {
 			return NextResponse.json(
-				{
-					error:
-						"Uploaded files must be under 4 MB on the hosted version. Try a smaller file or paste a shorter text excerpt.",
-				},
-				{ status: 413 },
+				{ error: upload.error },
+				{ status: upload.status },
 			);
 		}
 
-		const fileName = file.name;
+		const fileName = upload.fileName;
 		const extension = fileName.split(".").pop()?.toLowerCase();
-		const buffer = Buffer.from(await file.arrayBuffer());
+		const buffer = upload.buffer;
 		let text = "";
 
 		if (["txt", "md", "csv"].includes(extension ?? "")) {
