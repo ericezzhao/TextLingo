@@ -36,8 +36,8 @@ export function CreateCourseForm() {
 	);
 
 	const canSubmit = useMemo(
-		() => form.topic.trim() && !loading,
-		[form.topic, loading],
+		() => Boolean(form.topic.trim() || file) && !loading,
+		[form.topic, file, loading],
 	);
 
 	useEffect(() => {
@@ -82,8 +82,13 @@ export function CreateCourseForm() {
 
 			setStatusMessage("Structuring your learning map...");
 
+			const topic =
+				form.topic.trim() ||
+				extractedFile?.fileName.replace(/\.[^/.]+$/, "") ||
+				"Uploaded source material";
+
 			const course = await createCourse({
-				topic: form.topic,
+				topic,
 				currentKnowledge:
 					"Assume a motivated learner. Adapt explanations to the topic and source material; start approachable, then build depth progressively.",
 				goal: extractedFile
@@ -109,7 +114,10 @@ export function CreateCourseForm() {
 		>
 			<label className="space-y-2 block">
 				<span className="text-sm font-medium text-[hsl(var(--text-secondary))]">
-					What do you want to learn?
+					What do you want to learn?{" "}
+					<span className="text-[hsl(var(--text-tertiary))]">
+						{file ? "(optional because a source is uploaded)" : ""}
+					</span>
 				</span>
 				<input
 					className={`${inputClass} text-lg`}
@@ -127,8 +135,8 @@ export function CreateCourseForm() {
 					<span className="text-[hsl(var(--text-tertiary))]">(optional)</span>
 				</p>
 				<p className="mb-4">
-					TXT, PDF, or DOCX. Upload a paper, notes, syllabus, or article for
-					better course structure.
+					TXT, PDF, or DOCX. If you upload a source, TextLingo can build the
+					course directly from it without a separate topic.
 				</p>
 				<label className="lesson-button-shadow inline-flex cursor-pointer items-center justify-center rounded-xl border border-[hsl(var(--border-hover))] bg-[hsl(var(--surface))] px-4 py-2 font-semibold uppercase text-[hsl(var(--text-primary))] transition hover:-translate-y-0.5 hover:bg-[hsl(var(--surface-hover))] active:translate-y-1 active:shadow-none">
 					Choose file

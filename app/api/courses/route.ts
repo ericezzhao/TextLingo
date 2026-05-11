@@ -31,11 +31,20 @@ export async function POST(request: Request) {
 	try {
 		const input = (await request.json()) as GenerateCourseInput;
 
-		if (!normalizeText(input.topic) || !normalizeText(input.currentKnowledge)) {
+		const hasTopic = Boolean(normalizeText(input.topic));
+		const hasSource = Boolean(
+			normalizeText(input.sourceText) || normalizeText(input.sourceFileName),
+		);
+
+		if ((!hasTopic && !hasSource) || !normalizeText(input.currentKnowledge)) {
 			return NextResponse.json(
-				{ error: "Topic and current knowledge are required." },
+				{ error: "Enter a topic or upload source material." },
 				{ status: 400 },
 			);
+		}
+
+		if (!hasTopic && input.sourceFileName) {
+			input.topic = input.sourceFileName.replace(/\.[^/.]+$/, "");
 		}
 
 		const { learnerId, setCookie } = await getLearnerSession();
