@@ -113,12 +113,13 @@ function SectionReview({
 			>
 				<div className="group relative flex items-center justify-center">
 					{reviewComplete ? (
-						<div
-							className="lesson-button-shadow relative flex size-14 items-center justify-center overflow-hidden rounded-full border-2 border-[hsl(var(--green))] bg-[hsl(var(--surface))] text-[hsl(var(--green))] md:size-16"
+						<Link
+							href={`/course/${course.id}/review/${sectionOrder}`}
+							className="lesson-button-shadow relative flex size-14 items-center justify-center overflow-hidden rounded-full border-2 border-[hsl(var(--green))] bg-[hsl(var(--surface))] text-[hsl(var(--green))] transition hover:-translate-y-0.5 active:translate-y-1 active:shadow-none md:size-16"
 							aria-label={`${sectionTitle} section review complete`}
 						>
 							✓
-						</div>
+						</Link>
 					) : unlocked ? (
 						<Link
 							href={`/course/${course.id}/review/${sectionOrder}`}

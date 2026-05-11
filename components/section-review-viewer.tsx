@@ -54,8 +54,11 @@ function getSectionLessons(course: Course, sectionOrder: number) {
 
 function buildQuestions(lessons: Lesson[]): ReviewQuestion[] {
 	const questions: ReviewQuestion[] = [];
+	const lessonTitles = lessons.map((lesson) => lesson.title);
+	const objectives = lessons.map((lesson) => lesson.objective).filter(Boolean);
+	const summaries = lessons.map((lesson) => lesson.summary).filter(Boolean);
 
-	for (const lesson of lessons) {
+	for (const [index, lesson] of lessons.entries()) {
 		if (lesson.quiz?.options?.length === 4) {
 			questions.push({
 				lesson,
@@ -66,40 +69,80 @@ function buildQuestions(lessons: Lesson[]): ReviewQuestion[] {
 			});
 		}
 
-		const [firstPoint, secondPoint] = lesson.keyPoints;
-		if (firstPoint && secondPoint) {
+		const firstPoint = lesson.keyPoints[0];
+		const secondPoint = lesson.keyPoints[1];
+		const nextLesson = lessons[index + 1];
+		const previousLesson = lessons[index - 1];
+		const otherObjectives = objectives.filter(
+			(item) => item !== lesson.objective,
+		);
+		const otherSummaries = summaries.filter((item) => item !== lesson.summary);
+
+		if (firstPoint && secondPoint && otherObjectives.length >= 2) {
 			questions.push({
 				lesson,
-				question: `Which statement best captures the role of “${lesson.title}” in this section?`,
+				question: `In “${lesson.title},” what is the main idea to carry forward?`,
 				options: [
 					firstPoint,
-					`It is unrelated to ${lesson.sectionTitle ?? "this section"}.`,
-					`It only matters after the final lesson.`,
+					otherObjectives[0],
 					secondPoint,
+					otherObjectives[1],
 				],
 				answerIndex: 0,
 				explanation: firstPoint,
 			});
 		}
+
+		if (nextLesson && firstPoint && otherSummaries.length >= 2) {
+			questions.push({
+				lesson,
+				question: `How does “${lesson.title}” prepare you for “${nextLesson.title}”?`,
+				options: [
+					`It establishes ${firstPoint.toLowerCase()}, which ${nextLesson.title} builds on.`,
+					otherSummaries[0],
+					otherSummaries[1],
+					`It focuses on ${lessonTitles.at(-1) ?? "the final topic"} before the basics are introduced.`,
+				],
+				answerIndex: 0,
+				explanation: `${lesson.title} gives you the foundation for ${nextLesson.title}: ${firstPoint}`,
+			});
+		}
+
+		if (previousLesson && lesson.objective && otherObjectives.length >= 2) {
+			questions.push({
+				lesson,
+				question: `What should you be able to explain after “${lesson.title}”?`,
+				options: [
+					lesson.objective,
+					previousLesson.objective,
+					otherObjectives[0],
+					otherObjectives[1],
+				],
+				answerIndex: 0,
+				explanation: lesson.objective,
+			});
+		}
 	}
 
-	if (questions.length === 1 && lessons[0]) {
-		const lesson = lessons[0];
-		questions.push({
-			lesson,
-			question: `What should you be able to explain after studying “${lesson.title}”?`,
-			options: [
-				lesson.objective,
-				"Only the name of the topic",
-				"Only the order of lessons",
-				"A random definition without context",
-			],
-			answerIndex: 0,
-			explanation: lesson.objective,
-		});
+	if (questions.length < 3) {
+		for (const lesson of lessons) {
+			if (!lesson.objective) continue;
+			questions.push({
+				lesson,
+				question: `Which learning goal matches “${lesson.title}”?`,
+				options: [
+					lesson.objective,
+					...objectives.filter((item) => item !== lesson.objective).slice(0, 3),
+				].slice(0, 4),
+				answerIndex: 0,
+				explanation: lesson.objective,
+			});
+		}
 	}
 
-	return questions.slice(0, Math.max(3, Math.min(6, questions.length)));
+	return questions
+		.filter((question) => question.options.length === 4)
+		.slice(0, Math.max(3, Math.min(6, questions.length)));
 }
 
 export function SectionReviewViewer({
@@ -139,12 +182,6 @@ export function SectionReviewViewer({
 			active = false;
 		};
 	}, [courseId]);
-
-	useEffect(() => {
-		if (course?.completedLessonIds.includes(reviewCompletionId) && !finished) {
-			router.replace(`/course/${courseId}`);
-		}
-	}, [course, courseId, finished, reviewCompletionId, router]);
 
 	const sectionLessons = useMemo(
 		() => (course ? getSectionLessons(course, sectionOrder) : []),
