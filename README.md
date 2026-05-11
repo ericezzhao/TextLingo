@@ -55,8 +55,8 @@ Create a local `.env.local` file from `.env.example` and fill in the required va
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 OPENAI_API_KEY=your_openai_key
-OPENAI_MODEL=gpt-4.1-mini
-OPENAI_TUTOR_MODEL=gpt-4.1-mini
+OPENAI_MODEL=gpt-5.4-mini
+OPENAI_TUTOR_MODEL=gpt-5.4-mini
 ```
 
 The app also supports these Supabase key aliases if needed:

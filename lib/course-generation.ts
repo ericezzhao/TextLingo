@@ -170,7 +170,7 @@ async function generateWithOpenAI(
 			Authorization: `Bearer ${apiKey}`,
 		},
 		body: JSON.stringify({
-			model: process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
+			model: process.env.OPENAI_MODEL ?? "gpt-5.4-mini",
 			temperature: 0.65,
 			response_format: { type: "json_object" },
 			messages: [
