@@ -25,6 +25,12 @@ const buildingMessages = [
 	"Polishing quizzes and practice prompts...",
 ];
 
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+
+function formatFileSize(bytes: number) {
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function CreateCourseForm() {
 	const router = useRouter();
 	const [form, setForm] = useState<FormState>(initialState);
@@ -60,6 +66,12 @@ export function CreateCourseForm() {
 		try {
 			let extractedFile: ExtractedFile | null = null;
 
+			if (file && file.size > MAX_UPLOAD_BYTES) {
+				throw new Error(
+					`The selected file is ${formatFileSize(file.size)}. Vercel uploads must be under ${formatFileSize(MAX_UPLOAD_BYTES)} for this version.`,
+				);
+			}
+
 			if (file) {
 				setStatusMessage(`Extracting text from ${file.name}...`);
 				const uploadFormData = new FormData();
@@ -74,7 +86,10 @@ export function CreateCourseForm() {
 					const payload = (await extractResponse.json().catch(() => ({}))) as {
 						error?: string;
 					};
-					throw new Error(payload.error ?? "Could not read the uploaded file.");
+					throw new Error(
+						payload.error ??
+							`Could not read the uploaded file. Server returned ${extractResponse.status}.`,
+					);
 				}
 
 				extractedFile = (await extractResponse.json()) as ExtractedFile;
@@ -135,15 +150,28 @@ export function CreateCourseForm() {
 					<span className="text-[hsl(var(--text-tertiary))]">(optional)</span>
 				</p>
 				<p className="mb-4">
-					TXT, PDF, or DOCX. If you upload a source, TextLingo can build the
-					course directly from it without a separate topic.
+					TXT, PDF, or DOCX under {formatFileSize(MAX_UPLOAD_BYTES)}. If you
+					upload a source, TextLingo can build the course directly from it
+					without a separate topic.
 				</p>
 				<label className="lesson-button-shadow inline-flex cursor-pointer items-center justify-center rounded-xl border border-[hsl(var(--border-hover))] bg-[hsl(var(--surface))] px-4 py-2 font-semibold uppercase text-[hsl(var(--text-primary))] transition hover:-translate-y-0.5 hover:bg-[hsl(var(--surface-hover))] active:translate-y-1 active:shadow-none">
 					Choose file
 					<input
 						type="file"
 						accept=".txt,.md,.pdf,.doc,.docx"
-						onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+						onChange={(event) => {
+							const selectedFile = event.target.files?.[0] ?? null;
+							setError(null);
+							if (selectedFile && selectedFile.size > MAX_UPLOAD_BYTES) {
+								setFile(null);
+								setError(
+									`The selected file is ${formatFileSize(selectedFile.size)}. Please upload a file under ${formatFileSize(MAX_UPLOAD_BYTES)}.`,
+								);
+								event.target.value = "";
+								return;
+							}
+							setFile(selectedFile);
+						}}
 						className="sr-only"
 					/>
 				</label>

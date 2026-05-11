@@ -5,6 +5,7 @@ import pdfParse from "pdf-parse";
 export const runtime = "nodejs";
 
 const MAX_TEXT_LENGTH = 12000;
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 function trimText(value: string) {
 	const normalized = value.replace(/\s+/g, " ").trim();
@@ -21,6 +22,16 @@ export async function POST(request: Request) {
 
 		if (!(file instanceof File)) {
 			return NextResponse.json({ error: "No file uploaded." }, { status: 400 });
+		}
+
+		if (file.size > MAX_UPLOAD_BYTES) {
+			return NextResponse.json(
+				{
+					error:
+						"Uploaded files must be under 4 MB on the hosted version. Try a smaller file or paste a shorter text excerpt.",
+				},
+				{ status: 413 },
+			);
 		}
 
 		const fileName = file.name;
