@@ -15,7 +15,7 @@ export default function HomePage() {
 							</div>
 							<div className="space-y-4">
 								<h1 className="max-w-3xl text-5xl font-semibold leading-[1.02] tracking-[-0.04em] text-[hsl(var(--text-primary))] sm:text-6xl">
-									Learn what you thought you couldn&apos;t.
+									Turn any topic or document into a visual learning path.
 								</h1>
 								<p className="max-w-2xl text-lg leading-8 text-[hsl(var(--text-secondary))]">
 									Create visual learning maps from any topic or uploaded source
