@@ -2,7 +2,9 @@
 
 TextLingo is a visual AI learning web app built with Next.js. A learner enters a topic, optionally uploads source material, and receives a structured course with sections, lesson nodes, page-based lessons, quizzes, notes, section reviews, and progress tracking.
 
-Most learners are expected to use the hosted web app rather than running the project locally.
+## Demo
+
+https://github.com/user-attachments/assets/eae0c125-d9ae-4c58-bdba-bacd099ed909
 
 ## What is implemented
 
